@@ -2,6 +2,7 @@ import tensorflow as tf
 from music21 import converter, instrument, note, chord
 import matplotlib
 import glob
+import pickle
 import numpy
 from keras.models import Sequential
 from keras.layers import Dense
@@ -33,7 +34,9 @@ def get_notes() :
                 notes.append(str(element.pitch))
             elif isinstance(element, chord.Chord):
                 notes.append('.'.join(str(n) for n in element.normalOrder))
-    
+
+    with open('notes', 'wb') as filepath:
+        pickle.dump(notes, filepath)
     return notes
     
 def sequence(notes, n_vocab) :
@@ -62,18 +65,21 @@ def sequence(notes, n_vocab) :
     
     return (network_input, network_output)
 
-def create_model(network_input, n_vocab) :
+def create_model(network_input, n_vocab):
     model = Sequential()
     model.add(LSTM(
-        256,
-        input_shape=(network_input.shape[1], network_input.shape[2]), # trb vzt input ce forma are
+        512,
+        input_shape=(network_input.shape[1], network_input.shape[2]),
+        recurrent_dropout=0.3,
         return_sequences=True
     ))
+    model.add(LSTM(512, return_sequences=True, recurrent_dropout=0.3,))
+    model.add(LSTM(512))
+    model.add(BatchNorm())
     model.add(Dropout(0.3))
-    model.add(LSTM(512, return_sequences=True))
-    model.add(Dropout(0.3))
-    model.add(LSTM(256))
     model.add(Dense(256))
+    model.add(Activation('relu'))
+    model.add(BatchNorm())
     model.add(Dropout(0.3))
     model.add(Dense(n_vocab))
     model.add(Activation('softmax'))
@@ -81,6 +87,19 @@ def create_model(network_input, n_vocab) :
 
     return model
 
+def train(model, network_input, network_output):
+    """ train the neural network """
+    filepath = "weights-improvement-{epoch:02d}-{loss:.4f}-bigger.hdf5"
+    checkpoint = ModelCheckpoint(
+        filepath,
+        monitor='loss',
+        verbose=0,
+        save_best_only=True,
+        mode='min'
+    )
+    callbacks_list = [checkpoint]
+
+    model.fit(network_input, network_output, epochs=10, batch_size=128, callbacks=callbacks_list)
 
 def train_network():
     """ Train a Neural Network to generate music """
@@ -92,7 +111,7 @@ def train_network():
     network_input, network_output = sequence(notes, n_vocab)
 
     model = create_model(network_input, n_vocab)
-    model.fit(network_input, network_output, epochs=200, batch_size=128)
+    train(model, network_input, network_output)
 
 
 if __name__ == '__main__':
