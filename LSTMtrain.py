@@ -102,7 +102,6 @@ def train(model, network_input, network_output):
     model.fit(network_input, network_output, epochs=10, batch_size=128, callbacks=callbacks_list)
 
 def train_network():
-    """ Train a Neural Network to generate music """
     notes = get_notes()
 
     # get amount of pitch names
